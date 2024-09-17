@@ -41,8 +41,8 @@ public class RabbitMqPersistentConnection : IDisposable
         _tryCount = tryCount;
         _isLog = isLog;
         
-        // Initialize the timer to check the connection every 10 seconds (10000 milliseconds)
-        _connectionCheckTimer = new Timer(CheckConnection, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
+        // Initialize the timer to check the connection every 30 seconds (30000 milliseconds)
+        _connectionCheckTimer = new Timer(CheckConnection, null, TimeSpan.Zero, TimeSpan.FromSeconds(30));
     }
     
     // Check Connection method that will be called by the timer
