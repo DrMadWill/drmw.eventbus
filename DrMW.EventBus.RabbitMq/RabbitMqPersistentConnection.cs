@@ -83,7 +83,6 @@ public class RabbitMqPersistentConnection : IDisposable
 
         lock (_lockObject)
         {
-            _connection?.Dispose();
             var policy = Policy.Handle<SocketException>()
                 .Or<BrokerUnreachableException>()
                 .WaitAndRetry(_tryCount, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
@@ -97,7 +96,7 @@ public class RabbitMqPersistentConnection : IDisposable
 
             policy.Execute(() =>
             {
-                _connection = _connectionFactory.CreateConnection();
+                if(!IsConnection) _connection = _connectionFactory.CreateConnection();
             });
             if (!IsConnection)
             {

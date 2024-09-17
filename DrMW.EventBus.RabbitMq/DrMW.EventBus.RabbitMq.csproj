@@ -6,7 +6,7 @@
         <Nullable>enable</Nullable>
         <Authors>DrMadWill</Authors>
         <PackageIcon>Dr.png</PackageIcon>
-        <Version>1.0.2</Version>
+        <Version>1.0.5</Version>
     </PropertyGroup>
 
     <ItemGroup>
