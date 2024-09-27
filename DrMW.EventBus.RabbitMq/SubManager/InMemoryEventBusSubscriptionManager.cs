@@ -1,23 +1,23 @@
+using Dr.Rabbit.SubManager;
 using DrMW.EventBus.Core.Abstractions;
 using DrMW.EventBus.Core.BaseModels;
-using DrMW.EventBus.RabbitMq.Abstractions;
 
-namespace DrMW.EventBus.RabbitMq.SubManagers;
+namespace DrMW.EventBus.RabbitMq.SubManager;
 
 public class InMemoryEventBusSubscriptionManager : IEventBusSubscriptionManager
 {
     private readonly Dictionary<string, List<SubscriptionInfo>> _handlers;
     private readonly List<Type> _eventTypes;
-    private static readonly object _lockObject = new object();
+    private static readonly object LockObject = new object();
     public event EventHandler<string>? OnEventRemoved;
 
-    public Func<string, string> EventNameGetter;
+    private readonly Func<string, string> _eventNameGetter;
 
     public InMemoryEventBusSubscriptionManager(Func<string, string> eventNameGetter)
     {
         _handlers = new Dictionary<string, List<SubscriptionInfo>>();
         _eventTypes = new List<Type>();
-        EventNameGetter = eventNameGetter;
+        _eventNameGetter = eventNameGetter;
     }
 
     public bool IsEmpty => !_handlers.Keys.Any();
@@ -33,7 +33,7 @@ public class InMemoryEventBusSubscriptionManager : IEventBusSubscriptionManager
 
     public void AddSubscription<T, TH>() where T : IntegrationEvent where TH : IIntegrationEventHandler<T>
     {
-        lock (_lockObject)
+        lock (LockObject)
         {
             var eventName = GetEventKey<T>();
             AddSubscription(typeof(TH), eventName);
@@ -129,6 +129,6 @@ public class InMemoryEventBusSubscriptionManager : IEventBusSubscriptionManager
     public string GetEventKey<T>()
     {
         string eventName = typeof(T).Name;
-        return EventNameGetter(eventName);
+        return _eventNameGetter(eventName);
     }
 }

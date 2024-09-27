@@ -2,13 +2,8 @@ using DrMW.EventBus.Core.BaseModels;
 
 namespace DrMW.EventBus.Core.Abstractions;
 
-// ReSharper disable once InconsistentNaming
-public interface IIntegrationEventHandler<TIntegrationEvent> : IntegrationEventHandler
-where TIntegrationEvent : IntegrationEvent
+public interface IIntegrationEventHandler<in TEvent> 
+    where TEvent : IntegrationEvent
 {
-    Task Handle(TIntegrationEvent @event);
-}
-
-public interface IntegrationEventHandler
-{
+    Task Handle(TEvent @event);
 }

@@ -1,4 +1,4 @@
-namespace DrMW.EventBus.RabbitMq;
+namespace Dr.Rabbit.SubManager;
 
 public class SubscriptionInfo
 {

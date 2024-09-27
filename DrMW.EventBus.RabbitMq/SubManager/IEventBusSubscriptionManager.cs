@@ -1,7 +1,9 @@
+
+using Dr.Rabbit.SubManager;
 using DrMW.EventBus.Core.Abstractions;
 using DrMW.EventBus.Core.BaseModels;
 
-namespace DrMW.EventBus.RabbitMq.Abstractions;
+namespace DrMW.EventBus.RabbitMq.SubManager;
 
 public interface IEventBusSubscriptionManager
 {
