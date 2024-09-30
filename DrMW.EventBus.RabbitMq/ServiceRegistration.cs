@@ -10,7 +10,7 @@ public static class ServiceRegistration
 {
     public static  IServiceCollection AddRabbitMq(this IServiceCollection serviceCollection,string appName,string connectionString)
     {
-        serviceCollection.AddScoped<IEventBus>(sp => new EventBusRabbitMq(new BusConfig
+        serviceCollection.AddSingleton<IEventBus>(sp => new EventBusRabbitMq(new BusConfig
         {
             ConnectionRetryCount = 5,
             SubscriberClientAppName = appName,
@@ -22,7 +22,7 @@ public static class ServiceRegistration
     
     public static  IServiceCollection AddRabbitMq(this IServiceCollection serviceCollection,string appName,string connectionString,ConnectionFactory connectionFactory)
     {
-        serviceCollection.AddScoped<IEventBus>(sp => new EventBusRabbitMq(new BusConfig
+        serviceCollection.AddSingleton<IEventBus>(sp => new EventBusRabbitMq(new BusConfig
         {
             ConnectionRetryCount = 5,
             SubscriberClientAppName = appName,
@@ -34,13 +34,13 @@ public static class ServiceRegistration
     
     public static  IServiceCollection AddRabbitMq(this IServiceCollection serviceCollection,BusConfig config)
     {
-        serviceCollection.AddScoped<IEventBus>(sp => new EventBusRabbitMq(config, sp));
+        serviceCollection.AddSingleton<IEventBus>(sp => new EventBusRabbitMq(config, sp));
         return serviceCollection;
     }
     
     public static  IServiceCollection AddRabbitMq(this IServiceCollection serviceCollection,BusConfig config,ConnectionFactory connectionFactory)
     {
-        serviceCollection.AddScoped<IEventBus>(sp => new EventBusRabbitMq(config, sp, connectionFactory));
+        serviceCollection.AddSingleton<IEventBus>(sp => new EventBusRabbitMq(config, sp, connectionFactory));
         return serviceCollection;
     }
 }
