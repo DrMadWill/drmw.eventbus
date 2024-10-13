@@ -76,7 +76,7 @@ public class EventBusRabbitMq : BaseEventBus
         if (_consumerChannel != null)
         {
             await _consumerChannel.QueueDeclareAsync(queue: GetSubName(eventName),
-                durable: true, exclusive: false, autoDelete: true, arguments: null);
+                durable: true, exclusive: false, autoDelete: false, arguments: null);
             
             await _consumerChannel.QueueBindAsync(queue: GetSubName(eventName),exchange: _busConfig.DefaultTopicName,routingKey: eventName);
             
