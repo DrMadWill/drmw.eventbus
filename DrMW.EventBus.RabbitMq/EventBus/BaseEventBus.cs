@@ -41,38 +41,31 @@ public abstract class BaseEventBus : IEventBus
         _busConfig = null;
     }
 
-    public async Task<bool> ProcessEvent(string eventName, string message)
+    public async Task ProcessEvent(string eventName, string message)
     {
-        
         eventName = ProcessEventName(eventName);
         if (!SubManager.HasSubscriptionForEvent(eventName))
-            return false;
+            throw new Exception($"There is no subscription for this event. Please check your configuration. {eventName}");
 
-        var subscriptions = SubManager.GetHandlerForEvent(eventName);
+        var subscriptions = SubManager.GetHandlerForEvent(eventName).ToArray();
+        if(subscriptions.Length == 0)
+            throw new Exception($"There is no subscription for this event. Please check your configuration. {eventName}");
+        
         using var scope = _serviceProvider.CreateScope();
         foreach (var subscription in subscriptions)
         {
-            try
+            var handler = scope.ServiceProvider.GetService(subscription.HandlerType);
+            if (handler == null)
             {
-                var handler = scope.ServiceProvider.GetService(subscription.HandlerType);
-                if (handler == null)
-                {
-                    continue;
-                }
+                continue;
+            }
 
-                var eventType = SubManager.GetEventTypeByName($"{_busConfig.EventNamePrefix}{eventName}{_busConfig.EventNameSuffix}");
-                var integrationEvent = JsonConvert.DeserializeObject(message, eventType);
-                var concreteType = typeof(IIntegrationEventHandler<>).MakeGenericType(eventType);
-                await (Task)concreteType.GetMethod("Handle").Invoke(handler, new object[] { integrationEvent });
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-                    
-            }
+            var eventType = SubManager.GetEventTypeByName($"{_busConfig.EventNamePrefix}{eventName}{_busConfig.EventNameSuffix}");
+            var integrationEvent = JsonConvert.DeserializeObject(message, eventType);
+            var concreteType = typeof(IIntegrationEventHandler<>).MakeGenericType(eventType);
+            await (Task)concreteType.GetMethod("Handle").Invoke(handler, new object[] { integrationEvent });
         }
-
-        return true;
+       
     }
 
     public abstract Task Publish(IntegrationEvent @event);

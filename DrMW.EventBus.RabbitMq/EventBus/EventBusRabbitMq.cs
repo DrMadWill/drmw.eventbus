@@ -42,14 +42,6 @@ public class EventBusRabbitMq : BaseEventBus
     private async Task BasicPublishAsync(string message, string eventName)
     {
         await TryConnect();
-        var policy = Policy.Handle<BrokerUnreachableException>()
-            .Or<SocketException>()
-            .WaitAndRetry(_busConfig.ConnectionRetryCount,
-                retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                (ex, time) =>
-                {
-                    Console.WriteLine("ex => Event Bus Publish In RabbitMQ =>  " + ex);
-                });
         
         var body = Encoding.UTF8.GetBytes(message);
         var address = new PublicationAddress(ExchangeType.Direct, _busConfig.DefaultTopicName, eventName);
@@ -59,14 +51,11 @@ public class EventBusRabbitMq : BaseEventBus
             Persistent = true
         };
 
-        policy.Execute(() =>
-        {
-            _consumerChannel.BasicPublishAsync(addr : address,
-                basicProperties : properties
-                ,body: body).GetAwaiter().GetResult();
-        });
+        await _consumerChannel.BasicPublishAsync(addr: address,
+            basicProperties: properties
+            , body: body);
 
-        Console.WriteLine($"Mesaj ana kuyruğa tekrar gönderildi: Event: {eventName}");
+        Console.WriteLine($" Event: {eventName} Published to RabbitMQ | Message: {message}");
     }
 
     public override async Task Publish(IntegrationEvent @event)
@@ -127,9 +116,10 @@ public class EventBusRabbitMq : BaseEventBus
     
         try
         {
-            // Mesajı işle
+            // process event
             await ProcessEvent(eventName, message);
-            await _consumerChannel.BasicAckAsync(e.DeliveryTag, false); // Başarılı işlenirse onayla
+            // If success work then ack
+            await _consumerChannel.BasicAckAsync(e.DeliveryTag, false);
         }
         catch (Exception exception)
         {
@@ -160,6 +150,8 @@ public class EventBusRabbitMq : BaseEventBus
             
                 await _consumerChannel.BasicAckAsync(e.DeliveryTag, false); // Orijinal mesajı onayla
             }
+
+            throw;
         }
     }
 
