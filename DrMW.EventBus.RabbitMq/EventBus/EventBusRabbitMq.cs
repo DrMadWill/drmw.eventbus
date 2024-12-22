@@ -1,12 +1,11 @@
-using System.Net.Sockets;
 using System.Text;
+using System.Text.RegularExpressions;
 using DrMW.EventBus.Core.BaseModels;
 using DrMW.EventBus.RabbitMq.Configurations;
+using DrMW.EventBus.RabbitMq.Models;
 using Newtonsoft.Json;
-using Polly;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using RabbitMQ.Client.Exceptions;
 
 namespace DrMW.EventBus.RabbitMq.EventBus;
 
@@ -24,8 +23,6 @@ public class EventBusRabbitMq : BaseEventBus
         _consumerChannel = CreateConsumerChannel().GetAwaiter().GetResult();
         SubManager.OnEventRemoved += SubManger_OnEventRemoved;
         
-        if (config.OnDeadLetter != null)
-            SubscribeToDeadLetterQueue().GetAwaiter().GetResult();
     }
 
     private void SubManger_OnEventRemoved(object? sender, string eventName)
@@ -62,7 +59,7 @@ public class EventBusRabbitMq : BaseEventBus
     {
         var eventName = @event.GetType().Name;
         eventName = ProcessEventName(eventName);
-        var message = JsonConvert.SerializeObject(@event);
+        var message = SerializeObject(@event);
         await BasicPublishAsync(message, eventName);
     }
 
@@ -85,11 +82,7 @@ public class EventBusRabbitMq : BaseEventBus
         if (_consumerChannel != null)
         {
             await _consumerChannel.QueueDeclareAsync(queue: GetSubName(eventName),
-                durable: true, exclusive: false, autoDelete: false, arguments: new Dictionary<string, object>
-                {
-                    {"x-dead-letter-exchange", _busConfig.DeadLetterExchangeName}, // DLX tanımlama
-                    {"x-dead-letter-routing-key", eventName + ".dlq"} // DLQ routing anahtarı tanımlama
-                }!);
+                durable: true, exclusive: false, autoDelete: false, arguments: null);
             
             
             await _consumerChannel.QueueBindAsync(queue: GetSubName(eventName),exchange: _busConfig.DefaultTopicName
@@ -107,12 +100,6 @@ public class EventBusRabbitMq : BaseEventBus
         var eventName = e.RoutingKey;
         eventName = ProcessEventName(eventName);
         var message = Encoding.UTF8.GetString(e.Body.Span);
-        int maxRetryCount = 5;
-        // Mesaj başlığında retry count varsa al, yoksa 0 olarak başlat
-        var headers = e.BasicProperties.Headers;
-        int retryCount = headers != null && headers.TryGetValue("retry-count", out var header)
-            ? (int)(header ?? 0)
-            : 0;
     
         try
         {
@@ -123,88 +110,22 @@ public class EventBusRabbitMq : BaseEventBus
         }
         catch (Exception exception)
         {
-            Console.WriteLine($"Mesaj işlenemedi: {exception}");
-
-            // Retry limitine ulaştıysa, mesajı DLQ'ye yönlendir
-            if (retryCount >= maxRetryCount)
-            {
-                // Mesajı DLQ'ye yönlendirin veya başka bir log işlemi yapın
-                await _consumerChannel.BasicNackAsync(e.DeliveryTag, false, false); // DLQ'ye taşı
-                Console.WriteLine($"Mesaj DLQ'ye taşındı: {message}");
-            }
-            else
-            {
-                // Retry count artır ve tekrar kuyruğa koy
-                var properties = new BasicProperties
-                {
-                    Persistent = true,
-                    Headers = headers ?? new Dictionary<string, object>()!
-                };
-                properties.Headers["retry-count"] = retryCount + 1;
-                var address = new PublicationAddress(ExchangeType.Direct, _busConfig.DefaultTopicName, eventName);
-                // Mesajı tekrar kuyruğa koy
-                await _consumerChannel.BasicPublishAsync(
-                    addr:address,
-                    basicProperties:properties,
-                    body: e.Body);
+            Console.WriteLine($" [Event Error] ::: =>>> : {eventName} Event can't process: {exception}");
+            if (string.Equals(eventName, "DeadLetterQue", StringComparison.CurrentCultureIgnoreCase)) throw;
+            if(!eventName.Contains("EventError")) await BasicPublishAsync(message,"EventError" + eventName);
             
-                await _consumerChannel.BasicAckAsync(e.DeliveryTag, false); // Orijinal mesajı onayla
-            }
-
+            await BasicPublishAsync(SerializeObject(new DeadLetterQue
+            {
+                Base64Message = Convert.ToBase64String(Encoding.UTF8.GetBytes(message)),
+                EventName = eventName,
+                AppName = _busConfig.SubscriberClientAppName,
+                Prefix = _busConfig.EventNamePrefix
+            }), "DeadLetterQue");
             throw;
         }
     }
 
     
-    public async Task SubscribeToDeadLetterQueue()
-    {
-        // DLQ için kuyruğun adını alıyoruz.
-        var dlqQueueName = _busConfig.DeadLetterQueueName;
-
-        // DLQ kuyruğunu oluştur ve dinlemeye başla
-        await _consumerChannel.QueueDeclareAsync(
-            queue: dlqQueueName,
-            durable: true,
-            exclusive: false,
-            autoDelete: false,
-            arguments: null);
-
-        var consumer = new AsyncEventingBasicConsumer(_consumerChannel);
-        consumer.Received += DLQConsumer_Received; // Mesajlar geldiğinde çalışacak metodu belirliyoruz.
-    
-        await _consumerChannel.BasicConsumeAsync(queue: dlqQueueName, autoAck: false, consumer: consumer);
-    }
-
-    private async Task DLQConsumer_Received(object? sender, BasicDeliverEventArgs e)
-    {
-        var eventName = e.RoutingKey;
-        var message = Encoding.UTF8.GetString(e.Body.Span);
-
-        try
-        {
-            // Mesaj üzerinde özel işlemler yapabilirsiniz, örneğin loglama
-            Console.WriteLine($"DLQ'dan mesaj alındı: Event: {eventName}, Mesaj: {message}");
-        
-            // Mesajın tekrar işlenmesi gerekiyorsa buraya ekleyebilirsiniz
-            // await RequeueMessage(message, eventName);
-
-             await _busConfig.OnDeadLetter!(eventName, message);
-             
-            // İşleme başarılı olursa mesajı onaylayın
-            await _consumerChannel.BasicAckAsync(e.DeliveryTag, false);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"DLQ mesaj işlenirken hata: {ex.Message}");
-        
-            // Başarısız işleme durumunda DLQ mesajı işaretleyin
-            await _consumerChannel.BasicNackAsync(e.DeliveryTag, false, false);
-        }
-    }
-    
-  
-
-
     public override Task UnSubscribe<T, TH>()
     {
         SubManager.RemoveSubscription<T,TH>();
@@ -226,4 +147,13 @@ public class EventBusRabbitMq : BaseEventBus
             await _persistentConnection.TryConnect();
         } 
     }
+
+    private static string SerializeObject(object value)
+    {
+        return Regex.Unescape(JsonConvert.SerializeObject(value, new JsonSerializerSettings
+        {
+            ReferenceLoopHandling = ReferenceLoopHandling.Ignore
+        })); 
+    }
+    
 }

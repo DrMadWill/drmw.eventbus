@@ -14,5 +14,5 @@ public class BusConfig
     public string? ConnectionUrl { get; set; }
     public bool DeleteEventPrefix => !string.IsNullOrEmpty(EventNamePrefix);
     public bool DeleteEventSuffix => !string.IsNullOrEmpty(EventNameSuffix);
-    public Func<string, string, Task>? OnDeadLetter { get; set; } = null;
+   
 }

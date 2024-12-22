@@ -1,5 +1,4 @@
 using DrMW.EventBus.Core.Abstractions;
-using TestBus.Models.TestQueEvents;
 
 namespace ConsoleAppTest.Models.TestQueEvents;
 

@@ -20,6 +20,21 @@ public static class ServiceRegistration
         return serviceCollection;
     }
     
+    
+    // public static  IServiceCollection AddRabbitMq(this IServiceCollection serviceCollection,string appName,string connectionString,ILogging)
+    // {
+    //     serviceCollection.AddSingleton<IEventBus>(sp => new EventBusRabbitMq(new BusConfig
+    //     {
+    //         ConnectionRetryCount = 5,
+    //         SubscriberClientAppName = appName,
+    //         ConnectionUrl = connectionString
+    //     }, sp));
+    //     
+    //     return serviceCollection;
+    // }
+    //
+    
+    
     public static  IServiceCollection AddRabbitMq(this IServiceCollection serviceCollection,string appName,string connectionString,ConnectionFactory connectionFactory)
     {
         serviceCollection.AddSingleton<IEventBus>(sp => new EventBusRabbitMq(new BusConfig

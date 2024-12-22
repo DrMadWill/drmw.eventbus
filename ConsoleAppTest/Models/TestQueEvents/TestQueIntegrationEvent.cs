@@ -1,6 +1,6 @@
 using DrMW.EventBus.Core.BaseModels;
 
-namespace TestBus.Models.TestQueEvents;
+namespace ConsoleAppTest.Models.TestQueEvents;
 
 public class TestQueIntegrationEvent : IntegrationEvent
 {
