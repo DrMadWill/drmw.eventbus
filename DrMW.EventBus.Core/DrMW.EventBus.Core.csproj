@@ -5,7 +5,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <Authors>DrMadWill</Authors>
-        <Version>2</Version>
+        <Version>2.1</Version>
         <PackageIcon>avatar.png</PackageIcon>
     </PropertyGroup>
 

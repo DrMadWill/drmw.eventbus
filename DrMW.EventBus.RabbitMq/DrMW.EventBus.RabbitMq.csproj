@@ -6,7 +6,7 @@
         <Nullable>enable</Nullable>
         <Authors>DrMadWill</Authors>
         <PackageIcon>avatar.png</PackageIcon>
-        <Version>2.3</Version>
+        <Version>3.2</Version>
     </PropertyGroup>
 
     <ItemGroup>
@@ -22,7 +22,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="DrMW.EventBus.Core" Version="2.0.0" />
+      <PackageReference Include="DrMW.EventBus.Core" Version="2.1.0" />
       <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="6.0.0" />
       <PackageReference Include="Polly" Version="8.4.1" />
       <PackageReference Include="RabbitMQ.Client" Version="7.0.0-rc.11" />

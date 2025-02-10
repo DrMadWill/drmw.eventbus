@@ -69,6 +69,8 @@ public abstract class BaseEventBus : IEventBus
     }
 
     public abstract Task Publish(IntegrationEvent @event);
+    public abstract Task BasicPublishAsync(string message, string eventName);
+    public abstract Task StartBasicConsumeAsync(string eventName, Func<string, string, Task> response);
 
     public abstract Task Subscribe<T, TH>() where T : IntegrationEvent where TH : IIntegrationEventHandler<T>;
 

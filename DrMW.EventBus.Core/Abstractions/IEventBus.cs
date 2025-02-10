@@ -13,4 +13,7 @@ public interface IEventBus
     Task UnSubscribe<T, TH>()
         where T : IntegrationEvent
         where TH : IIntegrationEventHandler<T>;
+
+    Task BasicPublishAsync(string message, string eventName);
+    Task StartBasicConsumeAsync(string eventName, Func<string, string, Task> response);
 }

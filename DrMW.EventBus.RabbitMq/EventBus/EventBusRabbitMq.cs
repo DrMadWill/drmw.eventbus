@@ -36,7 +36,7 @@ public class EventBusRabbitMq : BaseEventBus
         }
     }
     
-    private async Task BasicPublishAsync(string message, string eventName)
+    public override async Task BasicPublishAsync(string message, string eventName)
     {
         await TryConnect();
         
@@ -76,6 +76,29 @@ public class EventBusRabbitMq : BaseEventBus
         SubManager.AddSubscription<T,TH>();  
         await StartBasicConsume(eventName);
     }
+    
+    public override async Task StartBasicConsumeAsync(string eventName,Func<string,string,Task> response)
+    {
+        if (_consumerChannel != null)
+        {
+            Console.WriteLine("Rabbit MQ | BasicConsume ==>>> : {0} event listening... ",eventName); 
+            await _consumerChannel.QueueDeclareAsync(queue: GetSubName(eventName),
+                durable: true, exclusive: false, autoDelete: false, arguments: null);
+            
+            
+            await _consumerChannel.QueueBindAsync(queue: GetSubName(eventName),exchange: _busConfig.DefaultTopicName
+                ,routingKey: eventName);
+            
+            var consumer = new AsyncEventingBasicConsumer(_consumerChannel);
+            consumer.Received += (sender, e) => {
+                var message = Encoding.UTF8.GetString(e.Body.Span);
+                Console.WriteLine($" [Event Received] ::: =>>> : {eventName} Event Received: {message}");
+                return response(message, eventName);
+            };
+            
+            await _consumerChannel.BasicConsumeAsync(queue: GetSubName(eventName), autoAck: false, consumer: consumer);
+        }
+    }
 
     private async Task StartBasicConsume(string eventName)
     {
@@ -103,6 +126,7 @@ public class EventBusRabbitMq : BaseEventBus
     
         try
         {
+            Console.WriteLine($" [Event Received] ::: =>>> : {eventName} Event Received: {message}");
             // process event
             await ProcessEvent(eventName, message);
             // If success work then ack
