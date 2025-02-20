@@ -80,7 +80,7 @@ public class PersistentConnection : IDisposable
     /// <summary>
     /// Connection Is Open ?
     /// </summary>
-    public bool IsConnection => _connection != null && _connection.IsOpen;
+    public bool IsConnection => _connection != null && _connection.IsOpen && !_disposed;
 
     /// <summary>
     /// Create Chanel

@@ -6,23 +6,29 @@ using DrMW.EventBus.RabbitMq.Models;
 using Newtonsoft.Json;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using Serilog;
 
 namespace DrMW.EventBus.RabbitMq.EventBus;
 
 public class EventBusRabbitMq : BaseEventBus
 {
     private readonly PersistentConnection _persistentConnection;
-    private readonly IChannel _consumerChannel;
+    private IChannel _consumerChannel;
+    private IChannel _publishChannel;
     private readonly BusConfig _busConfig;
-    public EventBusRabbitMq(BusConfig config, IServiceProvider serviceProvider,ConnectionFactory? connectionFactory = null) : 
+    private bool _publishChannelDisposed;
+    private bool _customerChannelDisposed;
+    public EventBusRabbitMq(BusConfig config, 
+        IServiceProvider serviceProvider,
+        ConnectionFactory? connectionFactory = null) : 
         base(config, serviceProvider)
     {
         _busConfig = config;
          connectionFactory ??= new ConnectionFactory{ Uri = new Uri(config.ConnectionUrl) };
         _persistentConnection = PersistentConnection.Instance(connectionFactory,config.ConnectionRetryCount); // Singleton
+        _publishChannel = CreatePublishChannel().GetAwaiter().GetResult();
         _consumerChannel = CreateConsumerChannel().GetAwaiter().GetResult();
         SubManager.OnEventRemoved += SubManger_OnEventRemoved;
-        
     }
 
     private void SubManger_OnEventRemoved(object? sender, string eventName)
@@ -48,11 +54,11 @@ public class EventBusRabbitMq : BaseEventBus
             Persistent = true
         };
 
-        await _consumerChannel.BasicPublishAsync(addr: address,
+        await _publishChannel.BasicPublishAsync(addr: address,
             basicProperties: properties
             , body: body);
 
-        Console.WriteLine($" Event: {eventName} Published to RabbitMQ | Message: {message}");
+        Log.Information($" Event: {eventName} Published to RabbitMQ | Message: {message}");
     }
 
     public override async Task Publish(IntegrationEvent @event)
@@ -67,7 +73,7 @@ public class EventBusRabbitMq : BaseEventBus
     {
         var eventName = typeof(T).Name;
         eventName = ProcessEventName(eventName);
-        Console.WriteLine("Rabbit MQ ==>>> : {0} event listening... ",eventName); 
+        Log.Information("Rabbit MQ ==>>> : {0} event listening... ",eventName); 
         if (!SubManager.HasSubscriptionForEvent(eventName))
         {
             if (!_persistentConnection.IsConnection)
@@ -81,7 +87,7 @@ public class EventBusRabbitMq : BaseEventBus
     {
         if (_consumerChannel != null)
         {
-            Console.WriteLine("Rabbit MQ | BasicConsume ==>>> : {0} event listening... ",eventName); 
+            Log.Information("Rabbit MQ | BasicConsume ==>>> : {0} event listening... ",eventName); 
             await _consumerChannel.QueueDeclareAsync(queue: GetSubName(eventName),
                 durable: true, exclusive: false, autoDelete: false, arguments: null);
             
@@ -92,7 +98,7 @@ public class EventBusRabbitMq : BaseEventBus
             var consumer = new AsyncEventingBasicConsumer(_consumerChannel);
             consumer.Received += (sender, e) => {
                 var message = Encoding.UTF8.GetString(e.Body.Span);
-                Console.WriteLine($" [Event Received] ::: =>>> : {eventName} Event Received: {message}");
+                Log.Information($" [Event Received] ::: =>>> : {eventName} Event Received: {message}");
                 return response(message, eventName);
             };
             
@@ -126,7 +132,7 @@ public class EventBusRabbitMq : BaseEventBus
     
         try
         {
-            Console.WriteLine($" [Event Received] ::: =>>> : {eventName} Event Received: {message}");
+            Log.Information($" [Event Received] ::: =>>> : {eventName} Event Received: {message}");
             // process event
             await ProcessEvent(eventName, message);
             // If success work then ack
@@ -134,8 +140,8 @@ public class EventBusRabbitMq : BaseEventBus
         }
         catch (Exception exception)
         {
-            Console.WriteLine($" [Event Error] ::: =>>> : {eventName} Event can't process: {exception}");
-            if (string.Equals(eventName, "DeadLetterQue", StringComparison.CurrentCultureIgnoreCase)) throw;
+            Log.Information($" [Event Error] ::: =>>> : {eventName} Event can't process: {exception}");
+            if (string.Equals(eventName, "DeadLetterQue", StringComparison.CurrentCultureIgnoreCase)) return;
             if(!eventName.Contains("EventError")) await BasicPublishAsync(message,"EventError" + eventName);
             
             await BasicPublishAsync(SerializeObject(new DeadLetterQue
@@ -145,7 +151,9 @@ public class EventBusRabbitMq : BaseEventBus
                 AppName = _busConfig.SubscriberClientAppName,
                 Prefix = _busConfig.EventNamePrefix
             }), "DeadLetterQue");
-            throw;
+            
+            await _consumerChannel.BasicAckAsync(e.DeliveryTag, false);
+           
         }
     }
 
@@ -155,13 +163,70 @@ public class EventBusRabbitMq : BaseEventBus
         SubManager.RemoveSubscription<T,TH>();
         return Task.CompletedTask;
     }
-
+    
+    // Yayın için kanal oluşturma
+    private async Task<IChannel> CreatePublishChannel()
+    {
+        await TryConnect();
+        var channel = await _persistentConnection.CreateChanel();
+        await channel.ExchangeDeclareAsync(exchange: _busConfig.DefaultTopicName, type: "direct");
+        channel.ChannelShutdown += (sender, args) =>
+        {
+            _publishChannelDisposed = true;
+            Log.Information($"[ Publish Chanel Connection Shutdown ] : {args.ReplyText}");
+            // Kanalı yeniden başlatmayı deneyin
+            ReinitializePublishChannel();
+        };
+        channel.CallbackException += (sender, args) =>
+        {
+            _publishChannelDisposed = true;
+            Log.Information($"[ Publish Chanel Connection Callback Exception ] : {args.Exception.Message}");
+            // Hata sonrası kanal yeniden oluşturulabilir
+            ReinitializePublishChannel();
+        };
+        return channel;
+    }
+    
     private async  Task<IChannel> CreateConsumerChannel()
     {
         await TryConnect();
         var channel = await _persistentConnection.CreateChanel();
         await channel.ExchangeDeclareAsync(exchange: _busConfig.DefaultTopicName,type :"direct");
+        channel.ChannelShutdown += (sender, args) =>
+        {
+            _customerChannelDisposed = true;
+            Log.Information($"[ Consumer Chanel Connection Shutdown ] : {args.ReplyText}");
+            ReinitializePublishChannel();
+        };
+        channel.CallbackException += (sender, args) =>
+        {
+            _customerChannelDisposed = true;
+            Log.Information($"[ CallbackException Chanel Connection Callback Exception ] : {args.Exception.Message}");
+            ReinitializePublishChannel();
+        };  
         return channel;
+    }
+    
+    
+    
+    private void ReinitializePublishChannel()
+    {
+        try
+        {
+            TryConnect().GetAwaiter().GetResult();
+            if (_publishChannelDisposed)
+            { 
+                _publishChannel = CreatePublishChannel().GetAwaiter().GetResult();
+            }
+            else
+            { 
+                _consumerChannel = CreateConsumerChannel().GetAwaiter().GetResult();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Gerekirse burada tekrar deneme mekanizması ekleyebilirsiniz
+        }
     }
     
     private async Task TryConnect()

@@ -6,6 +6,7 @@ using ConsoleAppTest.Models.TestQueEvents.Errors;
 using DrMW.EventBus.Core.Abstractions;
 using DrMW.EventBus.RabbitMq;
 using Microsoft.Extensions.DependencyInjection;
+using Serilog;
 
 Console.WriteLine("Hello, World!");
 IServiceCollection _serviceCollection;
@@ -15,6 +16,9 @@ _serviceCollection = new ServiceCollection();
 _serviceCollection.AddScoped<TestQueHandler>();
 _serviceCollection.AddScoped<EventErrorTestQueHandler>();
 _serviceCollection.AddScoped<GlobalErrorHandling>();
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateLogger();
 _serviceCollection.AddRabbitMq("Test.Que", "amqp://guest:guest@localhost:5672");
 var app = _serviceCollection.BuildServiceProvider();
 _bus = app.GetService<IEventBus>();
