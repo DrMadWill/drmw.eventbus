@@ -99,7 +99,23 @@ public class EventBusRabbitMq : BaseEventBus
             consumer.Received += (sender, e) => {
                 var message = Encoding.UTF8.GetString(e.Body.Span);
                 Log.Information($" [Event Received] ::: =>>> : {eventName} Event Received: {message}");
-                return response(message, eventName);
+
+                try
+                {
+                    return response(message, eventName);
+                }
+                catch (Exception exception)
+                {
+                    Log.Error("[Baseic Consume] : {0} Event can't process: {1}", eventName, exception);
+
+                    return Task.CompletedTask;
+                }
+                finally
+                {
+                    _consumerChannel.BasicAckAsync(e.DeliveryTag, false)
+                        .GetAwaiter().GetResult();
+                }
+                 
             };
             
             await _consumerChannel.BasicConsumeAsync(queue: GetSubName(eventName), autoAck: false, consumer: consumer);
@@ -129,21 +145,20 @@ public class EventBusRabbitMq : BaseEventBus
         var eventName = e.RoutingKey;
         eventName = ProcessEventName(eventName);
         var message = Encoding.UTF8.GetString(e.Body.Span);
-    
+
         try
         {
             Log.Information($" [Event Received] ::: =>>> : {eventName} Event Received: {message}");
             // process event
             await ProcessEvent(eventName, message);
             // If success work then ack
-            await _consumerChannel.BasicAckAsync(e.DeliveryTag, false);
         }
         catch (Exception exception)
         {
-            Log.Information($" [Event Error] ::: =>>> : {eventName} Event can't process: {exception}");
+            Log.Error($" [Event Error] ::: =>>> : {eventName} Event can't process: {exception}");
             if (string.Equals(eventName, "DeadLetterQue", StringComparison.CurrentCultureIgnoreCase)) return;
-            if(!eventName.Contains("EventError")) await BasicPublishAsync(message,"EventError" + eventName);
-            
+            if (!eventName.Contains("EventError")) await BasicPublishAsync(message, "EventError" + eventName);
+
             await BasicPublishAsync(SerializeObject(new DeadLetterQue
             {
                 Base64Message = Convert.ToBase64String(Encoding.UTF8.GetBytes(message)),
@@ -151,9 +166,11 @@ public class EventBusRabbitMq : BaseEventBus
                 AppName = _busConfig.SubscriberClientAppName,
                 Prefix = _busConfig.EventNamePrefix
             }), "DeadLetterQue");
-            
+        }
+        finally
+        {
             await _consumerChannel.BasicAckAsync(e.DeliveryTag, false);
-           
+
         }
     }
 
