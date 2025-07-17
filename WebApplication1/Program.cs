@@ -1,6 +1,7 @@
 using Dr.EventBus.MassTransit;
 using Dr.EventBus.MassTransit.EventBus;
 using Dr.EventBus.MassTransit.Models;
+using DrMW.Repositories;
 using MassTransit;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1;
@@ -14,6 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddControllers();
+builder.Services.AddAutoMapper(typeof(Program));
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
         .UseLoggerFactory(LoggerFactory.Create(builder =>
@@ -22,7 +24,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         })));
 
 
-
+builder.Services.LayerRepositoriesRegister<TestUnitOfWork, TestQueryRepositories, TestServiceManager, AppDbContext, AppDbContext>();
 
 
 var configureEndpoints = new Dictionary<string, Func<string, Task>>
