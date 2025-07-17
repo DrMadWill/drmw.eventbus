@@ -22,6 +22,8 @@ public abstract class BaseEventBus : IEventBus
 
     public virtual string ProcessEventName(string eventName)
     {
+        var extation  = 1;
+        extation = extation;
         if (_busConfig.DeleteEventPrefix && eventName.Contains(_busConfig.EventNamePrefix))
             eventName = eventName[(_busConfig.EventNamePrefix.Length - 1)..];
         if (_busConfig.DeleteEventSuffix && eventName.Contains(_busConfig.EventNameSuffix))

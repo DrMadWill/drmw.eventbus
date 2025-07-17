@@ -27,7 +27,7 @@ await _bus.Subscribe<EventErrorTestQueIntegrationEvent, EventErrorTestQueHandler
 await _bus.Subscribe<DeadLetterQueIntegrationEvent, GlobalErrorHandling>();
 
 
-for (int i = 1; i <= 1; i++)
+for (int i = 1; i <= 7; i++)
 {
     await _bus.Publish(new TestQueIntegrationEvent
     {

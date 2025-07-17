@@ -16,10 +16,11 @@ public class IntegrationEvent
         IntegrationEventIdCreatedDate = DateTime.UtcNow;
     }
 
-    [System.Text.Json.Serialization.JsonConstructor]
+    [JsonConstructor]
     public IntegrationEvent(Guid id, DateTime createdDate)
     {
         IntegrationEventId = id;
         IntegrationEventIdCreatedDate = createdDate;
     }
 }
+

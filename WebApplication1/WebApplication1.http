@@ -1,0 +1,15 @@
+@WebApplication1_HostAddress = http://localhost:5246
+
+GET {{WebApplication1_HostAddress}}/weatherforecast/
+Accept: application/json
+
+POST {{WebApplication1_HostAddress}}/weatherforecast2/
+Accept: application/json
+Content-Type: application/json
+{
+  "date": "2023-10-01T00:00:00",
+  "temperatureC": 25,
+  "summary": "Warm"
+}
+
+###
