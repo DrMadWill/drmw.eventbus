@@ -2,7 +2,7 @@ using System.Text;
 
 namespace Dr.EventBus.MassTransit.Models;
 
-public static class Utils
+public static class EventBusUtils
 {
     public static string GenerateRepairEventName(this string eventName)
     {
