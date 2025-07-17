@@ -81,8 +81,8 @@ app.MapGet("/weatherforecast", async () =>
         await eventBus.Publish(new TestConfiq
         {
             Info = "TestConfiq message from WeatherForecast endpoint"
-        });
-        await db.SaveChangesAsync();
+        },true);
+       
         
         var forecast = Enumerable.Range(1, 5).Select(index =>
                 new WeatherForecast
@@ -106,8 +106,7 @@ app.MapPost("/weatherforecast2", async (WeatherForecast forecast) =>
         var eventBus = scope.ServiceProvider.GetRequiredService<IEventBus>();
         // var endpoint = await sendProvider.GetSendEndpoint(new Uri("queue:another-endpoint"));
         // await endpoint.Send(new RepairId("123"));
-        await eventBus.RepairEvent("123", "test-config-a");
-        await db.SaveChangesAsync();
+        await eventBus.RepairEvent("123", "test-config-a",true);
         Console.WriteLine("Fixed is working");
     })
     .WithName("GetWeatherForecastByName")
